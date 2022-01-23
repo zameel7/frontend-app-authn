@@ -4,8 +4,6 @@ import { Redirect } from 'react-router-dom';
 
 import { sendPageEvent, sendTrackEvent } from '@edx/frontend-platform/analytics';
 import { injectIntl, intlShape } from '@edx/frontend-platform/i18n';
-import { getConfig } from '@edx/frontend-platform';
-import { getAuthService } from '@edx/frontend-platform/auth';
 import {
   Tabs,
   Tab,
@@ -34,10 +32,6 @@ const Logistration = (props) => {
 
     if (renameRegisterExperiment) {
       setRegisterRenameExpVariation(renameRegisterExperiment);
-    }
-    const authService = getAuthService();
-    if (authService) {
-      authService.getCsrfTokenService().getCsrfToken(getConfig().LMS_BASE_URL);
     }
   });
 

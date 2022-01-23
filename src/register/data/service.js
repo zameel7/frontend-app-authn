@@ -1,8 +1,9 @@
 import { getConfig } from '@edx/frontend-platform';
 import { getHttpClient, getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+import { logInfo } from '@edx/frontend-platform/logging';
 import querystring from 'querystring';
 
-export async function registerRequest(registrationInformation) {
+export async function registerRequest(registrationInformation, requestStartTime) {
   const requestConfig = {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     isPublic: true,
@@ -18,6 +19,8 @@ export async function registerRequest(registrationInformation) {
       throw (e);
     });
 
+  const responseTime = Date.now();
+  logInfo(`registration request response time before improvement: ${responseTime - requestStartTime} ms`);
   return {
     redirectUrl: data.redirect_url || `${getConfig().LMS_BASE_URL}/dashboard`,
     success: data.success || false,

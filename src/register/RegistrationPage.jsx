@@ -204,6 +204,7 @@ class RegistrationPage extends React.Component {
   handleSubmit = (e) => {
     e.preventDefault();
     const { startTime } = this.state;
+    const requestStartTime = Date.now();
     const totalRegistrationTime = (Date.now() - startTime) / 1000;
     let payload = {
       name: this.state.name,
@@ -250,7 +251,7 @@ class RegistrationPage extends React.Component {
     this.setState({
       totalRegistrationTime,
     }, () => {
-      this.props.registerNewUser(payload);
+      this.props.registerNewUser(payload, requestStartTime);
     });
   }
 

@@ -23,7 +23,8 @@ export function* handleNewUserRegistration(action) {
   try {
     yield put(registerNewUserBegin());
 
-    const { redirectUrl, success } = yield call(registerRequest, action.payload.registrationInfo);
+    const { redirectUrl, success } = yield call(registerRequest, action.payload.registrationInfo,
+      action.requestStartTime);
     yield put(registerNewUserSuccess(
       redirectUrl,
       success,
