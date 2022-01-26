@@ -3,8 +3,7 @@ import { getHttpClient, getAuthenticatedHttpClient } from '@edx/frontend-platfor
 import { logInfo } from '@edx/frontend-platform/logging';
 import querystring from 'querystring';
 
-export async function registerRequest(registrationInformation) {
-  const requestStartTime = Date.now();
+export async function registerRequest(registrationInformation, requestStartTime) {
   const requestConfig = {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     isPublic: true,

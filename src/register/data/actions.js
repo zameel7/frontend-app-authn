@@ -11,9 +11,10 @@ export const resetRegistrationForm = () => ({
 });
 
 // Register
-export const registerNewUser = registrationInfo => ({
+export const registerNewUser = (registrationInfo, requestStartTime) => ({
   type: REGISTER_NEW_USER.BASE,
   payload: { registrationInfo },
+  requestStartTime: { requestStartTime },
 });
 
 export const registerNewUserBegin = () => ({
