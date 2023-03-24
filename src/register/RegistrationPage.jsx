@@ -8,7 +8,7 @@ import { sendPageEvent } from '@edx/frontend-platform/analytics';
 import {
   getCountryList, getLocale, injectIntl,
 } from '@edx/frontend-platform/i18n';
-import { Form, StatefulButton } from '@edx/paragon';
+import { Form, Spinner, StatefulButton } from '@edx/paragon';
 import PropTypes from 'prop-types';
 import { Helmet } from 'react-helmet';
 import Skeleton from 'react-loading-skeleton';
@@ -37,10 +37,15 @@ import {
   setUserPipelineDataLoaded,
 } from './data/actions';
 import {
-  COUNTRY_CODE_KEY, COUNTRY_DISPLAY_KEY, FORM_SUBMISSION_ERROR,
+  COUNTRY_CODE_KEY,
+  COUNTRY_DISPLAY_KEY,
+  FIELDS,
+  FORM_SUBMISSION_ERROR,
 } from './data/constants';
 import { registrationErrorSelector, validationsSelector } from './data/selectors';
-import { getSuggestionForInvalidEmail, validateCountryField, validateEmailAddress } from './data/utils';
+import {
+  getSuggestionForInvalidEmail, isTpaHintedAuthentication, validateCountryField, validateEmailAddress,
+} from './data/utils';
 import messages from './messages';
 import RegistrationFailure from './RegistrationFailure';
 import { EmailField, UsernameField } from './registrationFields';
@@ -90,7 +95,7 @@ const RegistrationPage = (props) => {
   const [configurableFormFields, setConfigurableFormFields] = useState({ ...backedUpFormData.configurableFormFields });
   const [errors, setErrors] = useState({ ...backedUpFormData.errors });
   const [emailSuggestion, setEmailSuggestion] = useState({ ...backedUpFormData.emailSuggestion });
-
+  const [autoSubmitRegisterForm, setAutoSubmitRegisterForm] = useState(isTpaHintedAuthentication());
   const [errorCode, setErrorCode] = useState({ type: '', count: 0 });
   const [formStartTime, setFormStartTime] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
@@ -101,20 +106,46 @@ const RegistrationPage = (props) => {
   const platformName = getConfig().SITE_NAME;
 
   /**
+   * If auto submitting register form, we will check tos and honor code fields if they exist for feature parity.
+   */
+  const checkTOSandHonorCodeFields = () => {
+    if (Object.keys(fieldDescriptions).includes(FIELDS.HONOR_CODE)) {
+      setConfigurableFormFields(prevState => ({
+        ...prevState,
+        [FIELDS.HONOR_CODE]: true,
+      }));
+    }
+    if (Object.keys(fieldDescriptions).includes(FIELDS.TERMS_OF_SERVICE)) {
+      setConfigurableFormFields(prevState => ({
+        ...prevState,
+        [FIELDS.TERMS_OF_SERVICE]: true,
+      }));
+    }
+  };
+
+  /**
    * Set the userPipelineDetails data in formFields for only first time
    */
   useEffect(() => {
     if (!userPipelineDataLoaded) {
-      const { pipelineUserDetails } = thirdPartyAuthContext;
+      const { autoSubmitRegForm, pipelineUserDetails } = thirdPartyAuthContext;
       if (pipelineUserDetails && Object.keys(pipelineUserDetails).length !== 0) {
         const { name = '', username = '', email = '' } = pipelineUserDetails;
         setFormFields(prevState => ({
           ...prevState, name, username, email,
         }));
+        if (autoSubmitRegForm) {
+          setAutoSubmitRegisterForm(true);
+          checkTOSandHonorCodeFields();
+        }
         setUserPipelineDetailsLoaded(true);
       }
     }
-  }, [thirdPartyAuthContext, userPipelineDataLoaded, setUserPipelineDetailsLoaded]);
+  }, [ // eslint-disable-line react-hooks/exhaustive-deps
+    thirdPartyAuthContext,
+    userPipelineDataLoaded,
+    setUserPipelineDetailsLoaded,
+  ]);
 
   useEffect(() => {
     if (!formStartTime) {
@@ -409,9 +440,7 @@ const RegistrationPage = (props) => {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
+  const registerUser = () => {
     const totalRegistrationTime = (Date.now() - formStartTime) / 1000;
     let payload = { ...formFields };
 
@@ -458,6 +487,17 @@ const RegistrationPage = (props) => {
     props.registerNewUser(payload);
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    registerUser();
+  };
+
+  useEffect(() => {
+    if (autoSubmitRegisterForm && userPipelineDataLoaded) {
+      registerUser();
+    }
+  }, [autoSubmitRegisterForm, userPipelineDataLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const renderForm = () => {
     if (institutionLogin) {
       return (
@@ -481,7 +521,14 @@ const RegistrationPage = (props) => {
             getConfig().ENABLE_PROGRESSIVE_PROFILING_ON_AUTHN && Object.keys(optionalFields).includes('fields')
           }
         />
-        <div className="mw-xs mt-3">
+
+        {autoSubmitRegisterForm && !errorCode.type && (
+          <div className="mw-xs mt-5 text-center">
+            <Spinner animation="border" variant="primary" id="tpa-spinner" />
+          </div>
+        )}
+
+        <div className="mw-xs mt-3" hidden={autoSubmitRegisterForm && !errorCode.type}>
           <ThirdPartyAuthAlert
             currentProvider={currentProvider}
             platformName={platformName}
@@ -642,12 +689,10 @@ RegistrationPage.propTypes = {
   submitState: PropTypes.string,
   thirdPartyAuthApiStatus: PropTypes.string,
   thirdPartyAuthContext: PropTypes.shape({
-    currentProvider: PropTypes.string,
-    platformName: PropTypes.string,
-    providers: PropTypes.array,
-    secondaryProviders: PropTypes.array,
-    finishAuthUrl: PropTypes.string,
+    autoSubmitRegForm: PropTypes.bool,
     countryCode: PropTypes.string,
+    currentProvider: PropTypes.string,
+    finishAuthUrl: PropTypes.string,
     pipelineUserDetails: PropTypes.shape({
       email: PropTypes.string,
       name: PropTypes.string,
@@ -655,6 +700,9 @@ RegistrationPage.propTypes = {
       lastName: PropTypes.string,
       username: PropTypes.string,
     }),
+    platformName: PropTypes.string,
+    providers: PropTypes.array,
+    secondaryProviders: PropTypes.array,
   }),
   usernameSuggestions: PropTypes.arrayOf(PropTypes.string),
   userPipelineDataLoaded: PropTypes.bool,
@@ -694,12 +742,13 @@ RegistrationPage.defaultProps = {
   submitState: DEFAULT_STATE,
   thirdPartyAuthApiStatus: PENDING_STATE,
   thirdPartyAuthContext: {
+    autoSubmitRegForm: false,
+    countryCode: null,
     currentProvider: null,
     finishAuthUrl: null,
-    countryCode: null,
+    pipelineUserDetails: null,
     providers: [],
     secondaryProviders: [],
-    pipelineUserDetails: null,
   },
   usernameSuggestions: [],
   userPipelineDataLoaded: false,
